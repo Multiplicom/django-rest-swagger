@@ -195,9 +195,10 @@ class BaseMethodIntrospector(object):
             if key not in self.parent.methods():
                 missing_set.add(key)
         if missing_set:
-            raise Exception(
-                "methods %s in class docstring are not in view methods %s"
-                % (list(missing_set), list(self.parent.methods())))
+            pass
+            # raise Exception(
+            #     "methods %s in class docstring are not in view methods %s"
+            #     % (list(missing_set), list(self.parent.methods())))
 
     def get_yaml_parser(self):
         parser = YAMLDocstringParser(self)
