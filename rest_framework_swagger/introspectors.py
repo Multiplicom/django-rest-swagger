@@ -8,6 +8,8 @@ import re
 import yaml
 import importlib
 
+from rest_framework.exceptions import APIException
+
 from .compat import OrderedDict, strip_tags, get_pagination_attribures
 from abc import ABCMeta, abstractmethod
 
@@ -699,6 +701,10 @@ class ViewSetMethodIntrospector(BaseMethodIntrospector):
         if not hasattr(view, 'action'):
             setattr(view, 'action', self.method)
         view.request.method = self.http_method
+
+        # In MASTR reporter API we expect suffix as well as action to be present on the view object
+        setattr(view, 'suffix', 'List' if (view.action == 'list' or view.action == 'create') else 'Instance')
+
         return view
 
     def build_query_parameters(self):
