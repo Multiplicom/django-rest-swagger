@@ -2,7 +2,7 @@
 import importlib
 import rest_framework
 from rest_framework import viewsets
-from rest_framework.serializers import BaseSerializer
+from rest_framework.serializers import BaseSerializer, ModelSerializer
 from rest_framework_swagger import SWAGGER_SETTINGS
 
 from .introspectors import (
@@ -86,6 +86,13 @@ class DocumentationGenerator(object):
             doc_parser = method_introspector.get_yaml_parser()
 
             serializer = self._get_method_serializer(method_introspector)
+
+            # specifics of MASTR reporter, look at introspectors.py line 245
+            # We wan't to skip of the serializer is_authorized which we setup to happen
+            # if RichModelViewset fails on calling is_authorized for this specific action
+            if serializer and issubclass(serializer, ModelSerializer):
+                if not getattr(serializer, 'is_authorized', True):
+                    continue
 
             response_type = self._get_method_response_type(
                 doc_parser, serializer, introspector, method_introspector)
