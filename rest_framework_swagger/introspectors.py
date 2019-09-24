@@ -8,6 +8,8 @@ import re
 import yaml
 import importlib
 
+from rest_framework.exceptions import APIException
+
 from .compat import OrderedDict, strip_tags, get_pagination_attribures
 from abc import ABCMeta, abstractmethod
 
@@ -205,8 +207,12 @@ class BaseMethodIntrospector(object):
         parent_parser = YAMLDocstringParser(self.parent)
         self.check_yaml_methods(parent_parser.object.keys())
         new_object = {}
-        new_object.update(parent_parser.object.get(self.method, {}))
+        # Note: for some reason regular views defined as functions where omitted.
+        #       They where part of the parent_parser so I changed this part to update new_object if it's empty
         new_object.update(parser.object)
+        if not new_object:
+            new_object.update((parent_parser.object))
+        new_object.update(parent_parser.object.get(self.method, {}))
         parser.object = new_object
         return parser
 
@@ -225,11 +231,23 @@ class BaseMethodIntrospector(object):
                     return None
                 try:
                     serializer_class = view.get_serializer_class()
+                    # set it allways (otherwise some methods views in ViewSet might be ignored)
+                    serializer_class.is_authorized = True
                 except AssertionError as e:
                     if "should either include a `serializer_class` attribute, or override the `get_serializer_class()` method." in str(e):  # noqa
                         serializer_class = None
                     else:
                         raise
+
+                # NOTE: MASTR reporter only. Check if the view actually supports this action
+                # Later in docgenerator we will check if the ModelSerializer serializer is authorized
+                if hasattr(view, 'action') and view.action in ("create", "update", "partial_update", "destroy"):
+                    view.request.user.has_perm = lambda *args, **kwargs: True  # give the user all permissions
+                    try:
+                        view.is_authorized(action=view.action)
+                    except APIException as e:  # mastr reporter exceptions inherit from this
+                        serializer_class.is_authorized = False
+
                 return serializer_class
 
     def create_view(self):
@@ -699,6 +717,10 @@ class ViewSetMethodIntrospector(BaseMethodIntrospector):
         if not hasattr(view, 'action'):
             setattr(view, 'action', self.method)
         view.request.method = self.http_method
+
+        # In MASTR reporter API we expect suffix as well as action to be present on the view object
+        setattr(view, 'suffix', 'List' if (view.action == 'list' or view.action == 'create') else 'Instance')
+
         return view
 
     def build_query_parameters(self):
