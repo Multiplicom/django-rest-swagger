@@ -207,8 +207,12 @@ class BaseMethodIntrospector(object):
         parent_parser = YAMLDocstringParser(self.parent)
         self.check_yaml_methods(parent_parser.object.keys())
         new_object = {}
-        new_object.update(parent_parser.object.get(self.method, {}))
+        # Note: for some reason regular views defined as functions where omitted.
+        #       They where part of the parent_parser so I changed this part to update new_object if it's empty
         new_object.update(parser.object)
+        if not new_object:
+            new_object.update((parent_parser.object))
+        new_object.update(parent_parser.object.get(self.method, {}))
         parser.object = new_object
         return parser
 
